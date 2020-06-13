@@ -12,8 +12,6 @@ class Usermodel_efficientnet(object):
         
     def bottleneck(self, x):
         x = GlobalAveragePooling2D()(x)
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(rate=0.25)(x)
         x = Dense(self.category_count, activation='sigmoid')(x)
         return x
     
