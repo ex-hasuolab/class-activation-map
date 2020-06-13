@@ -9,6 +9,7 @@ from tensorflow.keras import utils
 import keras
 #from tensorflow.keras.datasets.cifar10 import load_data
 from tensorflow.keras.datasets.mnist import load_data
+from keras.preprocessing.image import ImageDataGenerator
 
 class Dataloader(object):
     """
@@ -22,7 +23,37 @@ class Dataloader(object):
     def __init__(self):
         pass
     
-    def get_data(self, resize_mode = False, resize_shape = None, cvtColor_mode = False):
+    def get_user_data(self, batch_size, train_dir = None, validation_dir = None, resize_shape = None):
+        # 訓練データ
+        if train_dir != None:
+            train_datagen = ImageDataGenerator(
+                                rescale=1.0/255,
+                                shear_range=0.2,  # これ以降は多分水増し関係の設定
+                                zoom_range=0.2,
+                                horizontal_flip=True  # 画像を取得するときにランダムに反転する
+                            )
+
+            self.train_generator = train_datagen.flow_from_directory(
+                train_dir,
+                target_size=resize_shape,
+                batch_size=batch_size,
+                class_mode='categorical',
+                shuffle=True
+            )
+        
+        # 検証データ
+        if train_dir != None:
+            validation_datagen = ImageDataGenerator(rescale=1.0/255)
+
+            self.validation_generator = validation_datagen.flow_from_directory(
+                validation_dir,
+                target_size=(H, W),
+                batch_size=batch_size,
+                class_mode='categorical',
+                shuffle=True
+            )       
+    
+    def get_mnist_data(self, resize_mode = False, resize_shape = None, cvtColor_mode = False):
         # load MNIST data
         (x_train, y_train), (x_test, y_test) = load_data()
         x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.175)
