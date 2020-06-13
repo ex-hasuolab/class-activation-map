@@ -48,9 +48,6 @@ class Solver(object):
         
     def train_generator(self, model):
         # callbackを定義する場合はここに記述
-        print("x_train shape {}".format(self.dataloader_instance.x_train.shape))
-        print("y_train shape {}".format(self.dataloader_instance.y_train.shape))
-
         """
         # 後で監視が必要ならHistory設定
         # history = Histories(self.epochs, self.initial_lr, self.drop, self.epochs_drop, self.accuracy, self.loss, self.learning_rate)
@@ -68,8 +65,8 @@ class Solver(object):
         tensorboard = TensorBoard(log_dir=log_dir, histogram_freq=1)
 
         callbacks = []
-        callbacks.append(model_checkpoint)
-        callbacks.append(tensorboard)
+        #callbacks.append(model_checkpoint)
+        #callbacks.append(tensorboard)
 
         model.fit_generator(self.dataloader_instance.train_generator, \
                   epochs=self.n_epochs, verbose=1, \
