@@ -23,35 +23,64 @@ class Dataloader(object):
     def __init__(self):
         pass
     
-    def get_user_data(self, batch_size, train_dir = None, validation_dir = None, resize_shape = None):
-        # 訓練データ
-        if train_dir != None:
-            train_datagen = ImageDataGenerator(
-                                rescale=1.0/255,
-                                shear_range=0.2,  # これ以降は多分水増し関係の設定
-                                zoom_range=0.2,
-                                horizontal_flip=True  # 画像を取得するときにランダムに反転する
-                            )
+    def get_user_data(self, train_dir, batch_size, validation_dir = None, resize_shape = (255, 255), test_dir = None, test_batch_size=1):
+        '''
+        ディレクトリ名を指定して画像データのジェネレータを生成する
 
-            self.train_generator = train_datagen.flow_from_directory(
-                train_dir,
-                target_size=resize_shape,
-                batch_size=batch_size,
-                class_mode='categorical',
-                shuffle=True
-            )
+        Paramteres
+        --------------
+        train_dir : str
+            訓練データのディレクトリへのパス
+        batch_size : int
+            訓練データ（と検証データ）のバッチサイズ
+        validation_dir : str
+            検証データのディレクトリへのパス
+        resize_shape : tuple
+            画像データをこのサイズにリサイズする
+        test_dir : str
+            テストデータのディレクトリへのパス
+        test_batch_size : int
+            テストデータのバッチサイズ（デフォルトは1）
+        '''
+        # 訓練データ
+        train_datagen = ImageDataGenerator(
+                            rescale=1.0/255,
+                            shear_range=0.2,  # これ以降は多分水増し関係の設定
+                            zoom_range=0.2,
+                            horizontal_flip=True  # 画像を取得するときにランダムに反転する
+                        )
+
+        self.train_generator = train_datagen.flow_from_directory(
+            train_dir,
+            target_size=resize_shape,
+            batch_size=batch_size,
+            class_mode='categorical',
+            shuffle=True
+        )
         
         # 検証データ
-        if train_dir != None:
+        if validation_dir != None:
             validation_datagen = ImageDataGenerator(rescale=1.0/255)
 
             self.validation_generator = validation_datagen.flow_from_directory(
                 validation_dir,
-                target_size=(H, W),
+                target_size=resize_shape,
                 batch_size=batch_size,
                 class_mode='categorical',
                 shuffle=True
             )       
+        
+        # テストデータ
+        if test_dir != None:
+            test_datagen = ImageDataGenerator(rescale=1.0/255)
+
+            self.test_generator = test_datagen.flow_from_directory(
+                test_dir,
+                target_size=resize_shape,
+                batch_size=1,
+                class_mode='categorical',
+                shuffle=True
+            )
     
     def get_mnist_data(self, resize_mode = False, resize_shape = None, cvtColor_mode = False):
         # load MNIST data
