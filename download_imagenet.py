@@ -1,3 +1,5 @@
+# 参考：https://github.com/takurooo/Python-ImageNet_Downloader
+
 #-------------------------------------------
 # import
 #-------------------------------------------
@@ -6,6 +8,8 @@ import os
 import codecs
 import collections
 from urllib import request
+import glob
+from PIL import Image
 
 #-------------------------------------------
 # global
@@ -15,20 +19,21 @@ from urllib import request
 #-------------------------------------------
 # functions
 #-------------------------------------------
-class ImageNet(object):
+class ImageNetDownloader(object):
     WNID_CHILDREN_URL="http://www.image-net.org/api/text/wordnet.structure.hyponym?wnid={}&full={}"
     WNID_TO_WORDS_URL="http://www.image-net.org/api/text/wordnet.synset.getwords?wnid={}"
     IMG_LIST_URL="http://www.image-net.org/api/text/imagenet.synset.geturls.getmapping?wnid={}"
     #BBOX_URL="http://www.image-net.org/api/download/imagenet.bbox.synset?wnid={}"
 
     def __init__(self, root=None):
-        self.root = root or os.getcwd()
-        self.img_dir = os.path.join(self.root, 'img')
-        self.list_dir = os.path.join(self.root, 'list')
-        self.wnid = ""
-        os.makedirs(self.root, exist_ok=True)
-        os.makedirs(self.img_dir, exist_ok=True)
-        os.makedirs(self.list_dir, exist_ok=True)
+        #self.root = root or os.getcwd()
+        #self.img_dir = os.path.join(self.root, 'img')
+        #self.list_dir = os.path.join(self.root, 'list')
+        #self.wnid = ""
+        #os.makedirs(self.root, exist_ok=True)
+        #os.makedirs(self.img_dir, exist_ok=True)
+        #os.makedirs(self.list_dir, exist_ok=True)
+        pass
 
     def _check_data(self, data):
         """
@@ -69,9 +74,9 @@ class ImageNet(object):
             imginfo[fname] = url
         return imginfo
 
-    def _get_data_with_url(self, url, invalid_urls=None):
+    def _get_data_with_url(self, url, invalid_urls=None, timeout=10):
         try:
-            with request.urlopen(url) as response:
+            with request.urlopen(url, timeout=timeout) as response:
                 if invalid_urls is not None:
                     for invalid_url in invalid_urls:
                         if response.geturl() == invalid_url:
@@ -99,7 +104,7 @@ class ImageNet(object):
                     write_format = "{} {}\n".format(fname, url)
                     f.write(write_format)
 
-    def _download_imgs(self, path, imginfo, limit=0, verbose=False):
+    def _download_imgs(self, path, imginfo, limit=0, verbose=False, timeout=10):
         UNAVAILABLE_IMG_URL="https://s.yimg.com/pw/images/en-us/photo_unavailable.png"
         num_of_img = len(imginfo)
         n_saved = 0
@@ -112,7 +117,7 @@ class ImageNet(object):
                 continue
 
             invalid_urls = [UNAVAILABLE_IMG_URL]
-            img = self._get_data_with_url(url, invalid_urls)
+            img = self._get_data_with_url(url, invalid_urls, timeout=timeout)
 
             if img is None:
                 continue
@@ -154,18 +159,61 @@ class ImageNet(object):
         words = [word for word in words if word]
         return words
 
-    def download(self, wnid, limit=0, verbose=False):
+    def download(self, wnid, img_dir, list_dir, limit=0, verbose=False, timeout=10):
         """
-        指定したwnidに属する画像をimgフォルダに保存
-        """
-        self._check_wnid(wnid)
-        list_path = os.path.join(self.list_dir, wnid+'.txt')
-        if not os.path.exists(list_path):
-            self._download_imglist(self.list_dir, wnid)
+        指定したWNIDに属する画像をimgフォルダに保存
 
+        Parameters
+        --------------
+        wnid : str
+            ダウンロードする画像のWNID
+        image_dir : str
+            画像を保存するディレクトリ名
+        list_dir : str
+            読み込んだデータ一覧を格納するディレクトリ
+            指定したディレクトリ内に「<wnid>.txt」のファイルが作成される
+            （※デフォルトでは一覧を作成しないようにしたい）
+        limit : int
+            ダウンロード画像の上限
+        verbose : bool
+            ログを表示するかどうか
+        timeout : float
+            各URLへの通信のタイムアウト時間を秒数で指定
+        """
+        self.wnid = ""
+        os.makedirs(img_dir, exist_ok=True)
+        os.makedirs(list_dir, exist_ok=True)
+
+        self._check_wnid(wnid)
+
+        list_path = os.path.join(list_dir, wnid+'.txt')
+        if not os.path.exists(list_path):
+            self._download_imglist(list_dir, wnid)
         imginfo = self._make_imginfo(list_path)
 
-        img_dir = os.path.join(self.img_dir, wnid)
         os.makedirs(img_dir, exist_ok=True)
 
-        self._download_imgs(img_dir, imginfo, limit, verbose)
+        self._download_imgs(img_dir, imginfo, limit, verbose, timeout=timeout)
+
+
+def delete_unreadable_image(dir_path, extension='jpg'):
+    '''
+    PILで読み込めない画像データを削除する
+    
+    Parameters
+    ---------------
+    dir_path : str
+        調べたいディレクトリへのパス
+        このディレクトリ内の指定した拡張子のファイル全て調べる
+    extension : str
+        調べるファイルの拡張子
+    '''
+    # 指定した拡張子のファイルリストを作成
+    img_path_list = glob.glob(os.path.join(dir_path, '**/*.'+extension))
+    
+    # 全画像を調べる
+    for path in img_path_list:
+        try:
+            img = Image.open(path)
+        except:
+            os.remove(path)
