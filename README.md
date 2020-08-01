@@ -7,9 +7,9 @@ checkpoint : 重み
 frozen_inference_graph.pb : 
 model.ckpt.data-00000-of-00001 : 
 model.ckpt.index : 
-model.ckpt.meta
-pipeline.config
-saved_model
+model.ckpt.meta : 構造？？
+pipeline.config :
+saved_model :
 
 # 参考
 https://qiita.com/sanoyo/items/1a5c4e8671203d190fca
