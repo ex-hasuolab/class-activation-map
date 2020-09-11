@@ -1,0 +1,15 @@
+version: '2.3'
+
+services:
+  python:
+    build:
+        context: ./
+        dockerfile: Dockerfile
+    image: object_detection_api:tf2
+    container_name: object_detection_api
+    ports:
+      - 8882:8888
+    # volumes:
+    #   - ./:/home/tensorflow/models
+    command: /bin/sh -c "while :; do sleep 10; done"
+    # command: /bin/bassh -c "jupyter notebook"
