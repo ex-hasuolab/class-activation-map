@@ -26,7 +26,9 @@ USER tensorflow
 WORKDIR /home/tensorflow
 
 # Copy this version of of the model garden into the image
-COPY --chown=tensorflow . /home/tensorflow/models
+#COPY --chown=tensorflow . /home/tensorflow/models
+RUN git clone --depth 1 https://github.com/tensorflow/models &&\
+    chown -R tensorflow models
 
 # Compile protobuf configs
 RUN (cd /home/tensorflow/models/research/ && protoc object_detection/protos/*.proto --python_out=.)
@@ -40,3 +42,8 @@ RUN python -m pip install .
 
 RUN python -m pip install jupyterlab
 ENV TF_CPP_MIN_LOG_LEVEL 3
+
+# Jupyter設定
+RUN jupyter notebook --generate-config
+RUN echo "c.NotebookApp.notebook_dir = '/home/tensorflow'" >> ~/.jupyter/jupyter_notebook_config.py &&\
+    echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py
