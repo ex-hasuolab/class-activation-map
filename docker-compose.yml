@@ -5,10 +5,13 @@ services:
     build:
         context: ./
         dockerfile: Dockerfile
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
     image: object_detection_api:tf2
     container_name: object_detection_api
     ports:
       - 8882:8888
-    volumes:
-      - ./:/home/tensorflow/models
+    #volumes:
+    #  - ./:/home/tensorflow/
     command: /bin/bash -c "jupyter notebook --port 8888 --ip=0.0.0.0"

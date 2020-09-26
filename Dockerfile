@@ -40,10 +40,13 @@ ENV PATH="/home/tensorflow/.local/bin:${PATH}"
 RUN python -m pip install -U pip
 RUN python -m pip install .
 
-RUN python -m pip install jupyterlab
+# 上でpip installされるtensorflow:2.3.0を削除
+RUN python -m pip uninstall -y tensorflow
+RUN python -m pip install jupyterlab \
+    imageio
 ENV TF_CPP_MIN_LOG_LEVEL 3
 
 # Jupyter設定
 RUN jupyter notebook --generate-config
-RUN echo "c.NotebookApp.notebook_dir = '/home/tensorflow'" >> ~/.jupyter/jupyter_notebook_config.py &&\
-    echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py
+RUN echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py
+#    echo "c.NotebookApp.notebook_dir = '/home/tensorflow'" >> ~/.jupyter/jupyter_notebook_config.py &&\
