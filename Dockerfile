@@ -43,7 +43,9 @@ RUN python -m pip install .
 # 上でpip installされるtensorflow:2.3.0を削除
 RUN python -m pip uninstall -y tensorflow
 RUN python -m pip install jupyterlab \
-    imageio
+    imageio \
+    scikit-learn \
+    keras
 ENV TF_CPP_MIN_LOG_LEVEL 3
 
 # Jupyter設定

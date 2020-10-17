@@ -12,6 +12,6 @@ services:
     container_name: object_detection_api
     ports:
       - 8882:8888
-    #volumes:
-    #  - ./:/home/tensorflow/
-    command: /bin/bash -c "jupyter notebook --port 8888 --ip=0.0.0.0"
+    volumes:
+      - ./:/home/deeplearning-set
+    command: /bin/bash -c "jupyter lab --port 8888 --ip=0.0.0.0"
