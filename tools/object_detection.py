@@ -35,10 +35,16 @@ def xml_to_labels(annotation_file):
     # xml操作
     root = ET.XML(xml_data)
     obj_to_int = lambda x: int(x.text)
-    df_annotations = pd.DataFrame(columns=['x', 'y', 'w', 'h', 'label'])
+    df_annotations = pd.DataFrame(columns=['x', 'y', 'w', 'h', 'width', 'height', 'label'])
     for i, child in enumerate(root):
         if child.tag == 'filename':
             img_filename = child.text
+        if child.tag == 'size':
+            for subchild in child:
+                if subchild.tag == 'width':
+                    width = int(subchild.text)
+                if subchild.tag == 'height':
+                    height = int(subchild.text)
         if child.tag == 'object':
             # 各objectにname,bndboxタグが必ず1つのみついていることを想定して値を読み取る
             for subchild in child:
@@ -51,7 +57,7 @@ def xml_to_labels(annotation_file):
             h = ymax - ymin
             # DFに追加
             df_annotations = df_annotations.append(
-                {'x': xmin, 'y': ymin, 'w': w, 'h': h, 'label': label},
+                {'x': xmin, 'y': ymin, 'w': w, 'h': h, 'width': width, 'height': height, 'label': label},
                 ignore_index=True
             )
     return img_filename, df_annotations
