@@ -10,8 +10,11 @@ import keras
 #from tensorflow.keras.datasets.cifar10 import load_data
 from tensorflow.keras.datasets.mnist import load_data
 from keras.preprocessing.image import ImageDataGenerator
-from .object_detection import xml_to_labels
+from .object_detection import get_annotations
 import os
+import glob
+import tensorflow as tf
+from PIL import Image
 
 class Dataloader(object):
     """
@@ -57,11 +60,10 @@ class Dataloader(object):
         rescale : float
             画素値のリスケーリング係数。Noneか0ならば適用しない
         shear_range : float
-            シアー強度（半時計周り） TODO BBOX情報と関連させるのは難しい？
+            シアー強度（半時計周り）
         zoom_range : float or [float, float]
             ランダムにズームする範囲。
             リストを与えた場合は [lower, upper]。floatを与えた場合は [lower, upper]=[1-zoom_range, 1+zoom_range] 
-            TODO BBOX情報と関連させるのは難しい？
         horizontal_flip : bool
             水平方向に入力をランダムに反転するかどうか
         shuffle : bool
@@ -167,21 +169,21 @@ class Dataloader(object):
         return img_color
     
 
-    def get_image_bbox(self, train_dir, annotation_dir, validation_dir=None, test_dir=None,
-                       batch_size=10,
-                       test_batch_size=1,
-                       resize_shape=(255, 255),
-                       rescale=None,
-                       shuffle=True):
+    ####################
+    # 物体検出用データローダ（TODO ここまでのコードと完全に分離できるので別ファイルでもいい？）
+    ####################
+    def get_object_detection_data(self, train_dir, validation_dir=None, test_dir=None,
+                                  batch_size=10,
+                                  test_batch_size=1,
+                                  resize_shape=(255, 255),
+                                  add_imagefile_extension=None):
         '''
-        指定したディレクトリ内にある画像とBBOX情報を取得するジェネレータを作成する
+        ディレクトリ名を指定して画像データとBBOXのジェネレータを生成する
 
         Paramteres
         --------------
         train_dir : str
             訓練データのディレクトリへのパス
-        annotation_dir : str
-            Annotationのディレクトリへのパス
         validation_dir : str
             検証データのディレクトリへのパス
         test_dir : str
@@ -190,139 +192,221 @@ class Dataloader(object):
             訓練データ（と検証データ）のバッチサイズ
         test_batch_size : int
             テストデータのバッチサイズ（デフォルトは1）
-        resize_shape : tuple
-            画像データをこのサイズにリサイズする
-        rescale : float
-            画素値のリスケーリング係数。Noneか0ならば適用しない
-        shuffle : bool
-            データをシャッフルするかどうか
-        
+        resize_shape : tuple or None
+            画像データをこのサイズに統一する。Noneの場合はリサイズしない
+        add_imagefile_extension : str or optional
+            AnnotationのXMLファイルのfilenameに拡張子が含まれていない場合、ここで指定する。
+
         Notes
         --------------
-        ディレクトリ構造は以下の通り。
-        まず画像ファイルを読み込み、同じファイル名（拡張子以外）をAnnotationディレクトリから探す
-        AnnotationはXMLファイルで固定
-        ※kerasのdatageneratorを利用するため、画像のディレクトリ構造に無駄がある。クラスはAnnotationデータのものを使用
-        train/
-            ┣ class1
-            ┃   ┣ class1_01.jpg
-            ┃   ┗ class1_02.jpg
-            ...
-        validation/
-            ┣ class1
-            ┃   ┣ class1_11.jpg
-            ...
-        test/
-            ┣ class1
-            ┃   ┣ class1_12.jpg
-            ...
-        Annotation/
-            ┣ class1_01.xml
-            ┣ class1_02.xml
+        ディレクトリ構造は以下の通りにする
+        train_dir/
+            ┣ images/
+            ┃   ┣ image01.jpg
+            ┃   ┃ image02.jpg
+            ┃   ...
+            ┗ annotation/
+                 ┣ annotation01.xml
+                 ┃ annotation02.xml
+                 ...
+        ※validation_dir, test_dirも同様
         '''
-        # 画像データの読み込み
-        self.get_user_data(train_dir, validation_dir=validation_dir, test_dir=test_dir,
-                           batch_size=batch_size,   # 一旦バッチ数を1とする
-                           test_batch_size=1,
-                           resize_shape=resize_shape,
-                           rescale=rescale,
-                           horizontal_flip=False,  # augumentationするとBBOX情報の変換が難しくなる。augumentationやるならデータ読み込みから自作
-                           shuffle=False)  # 画像とBBOXの紐づけのためここではシャッフルしない
-        
-        # 画像データと画像ファイル名を対応づける
-        self.x_train, self.image_filename_train = self._get_image_filename_from_datagenrator(self.train_generator)
-        if validation_dir is not None:
-            self.x_valid, self.image_filename_valid = self._get_image_filename_from_datagenrator(self.validation_generator)
-        if test_dir is not None:
-            self.x_test, self.image_filename_test = self._get_image_filename_from_datagenrator(self.test_generator)
-        
-        # 画像ファイル名からAnntationファイル名に変換
-        self.annotation_filename_train = list(map(self._image_filename_to_annotation_filename, self.image_filename_train))
-        if validation_dir is not None:
-            self.annotation_filename_valid = list(map(self._image_filename_to_annotation_filename, self.image_filename_valid))
-        if test_dir is not None:
-            self.annotation_filename_test = list(map(self._image_filename_to_annotation_filename, self.image_filename_test))
-        
-        # AnnotationファイルからBBOX情報を取り出し、画像データのインデックスと紐づけ
-        self.df_bbox_train = list(map(self._get_bbox_info,
-                                      [annotation_dir]*len(self.annotation_filename_train),
-                                      self.annotation_filename_train,
-                                      list(range(len(self.annotation_filename_train)))))
-        self.df_bbox_train = pd.concat(self.df_bbox_train).reset_index(drop=True)
-        if validation_dir is not None:
-            self.df_bbox_valid = list(map(self._get_bbox_info,
-                                        [annotation_dir]*len(self.annotation_filename_valid),
-                                        self.annotation_filename_valid,
-                                        list(range(len(self.annotation_filename_valid)))))
-            self.df_bbox_valid = pd.concat(self.df_bbox_valid).reset_index(drop=True)
-        if test_dir is not None:
-            self.df_bbox_test = list(map(self._get_bbox_info,
-                                        [annotation_dir]*len(self.annotation_filename_test),
-                                        self.annotation_filename_test,
-                                        list(range(len(self.annotation_filename_test)))))
-            self.df_bbox_test = pd.concat(self.df_bbox_test).reset_index(drop=True)
-        
-        # BBOX情報を、画像サイズの変換に合わせる
-        # TODO df_bbox_trainの元画像サイズ(width,height)と、この関数の引数resize_shapeを突き合わせる
+        #############
+        # Annotationデータフレームの作成
+        #############
+        # 訓練データ
+        self.df_annotation_train = self._get_df_annotation(
+            os.path.join(train_dir, 'annotation'),
+            add_imagefile_extension=add_imagefile_extension)
+        # リサイズ
+        if resize_shape is not None:
+            self.df_annotation_train_resized = self._resize_annotation(
+                self.df_annotation_train, resize_shape)
+        # クラス名とインデックスの対応関係を取得
+        df_label_index = self.df_annotation_train[['class_label', 'class_index']].drop_duplicates()
+        self.label_to_index = df_label_index.set_index('class_label')['class_index'].to_dict()
+        self.index_to_label = df_label_index.set_index('class_index')['class_label'].to_dict()
 
-        # ジェネレータを作成
+        # 検証データ
+        if validation_dir is not None:
+            self.df_annotation_validation = self._get_df_annotation(
+                os.path.join(validation_dir, 'annotation'),
+                class_index_map=self.classlabel_to_index,
+                add_imagefile_extension=add_imagefile_extension)
+            # リサイズ
+            if resize_shape is not None:
+                self.df_annotation_validation_resized = self._resize_annotation(
+                    self.df_annotation_validation, resize_shape)
         
-    
-    def _get_image_filename_from_datagenrator(self, datagen):
+        # テストデータ
+        if test_dir is not None:
+            self.df_annotation_test = self._get_df_annotation(
+                os.path.join(test_dir, 'annotation'),
+                class_index_map=self.classlabel_to_index,
+                add_imagefile_extension=add_imagefile_extension)
+            # リサイズ
+            if resize_shape is not None:
+                self.df_annotation_test_resized = self._resize_annotation(
+                    self.df_annotation_test, resize_shape)
+        
+        ##########
+        # generator作成
+        ##########
+        # 訓練データ
+        df_annotation = self.df_annotation_train if resize_shape is None\
+                            else self.df_annotation_train_resized
+        self.train_generator = self._image_annotation_generator(
+            os.path.join(train_dir, 'images'),
+            df_annotation,
+            batch_size,
+            resize_shape=resize_shape)
+        
+        # 検証データ
+        if validation_dir is not None:
+            df_annotation = self.df_annotation_validation if resize_shape is None\
+                                else self.df_annotation_validation_resized
+            self.validation_generator = self._image_annotation_generator(
+                os.path.join(validation_dir, 'images'),
+                df_annotation,
+                batch_size,
+                resize_shape=resize_shape)
+        # テストデータ
+        if test_dir is not None:   
+            df_annotation = self.df_annotation_test if resize_shape is None\
+                                else self.df_annotation_test_resized
+            self.test_generator = self._image_annotation_generator(
+                os.path.join(test_dir, 'images'),
+                df_annotation,
+                batch_size,
+                resize_shape=resize_shape)
+
+    def _get_df_annotation(self,
+                           annotation_path,
+                           class_index_map=None,
+                           add_imagefile_extension=None):
         """
-        datageneratorに含まれる画像とそのファイル名を取得
-        
-        Parameters
-        ------------
-        datagen
-            kerasのImageDataGeneratorから作成したジェネレータ
+        Annotationデータフレームを取得する
+
+        Paramteres
+        --------------
+        annotation_path : str
+            Annotationデータ(XML)が格納されたディレクトリへのパス
+        class_index_map : dict {str: int}, optional
+            Annotationファイルに書かれているクラス名(str)とクラスインデックス(int)を対応させる辞書。
+            Noneの場合は自動でクラスインデックスを作成。
+        add_imagefile_extension : str or optional
+            AnnotationのXMLファイルのfilenameに拡張子が含まれていない場合、ここで指定する。
         
         Returns
-        -----------
-        images : numpy.array (shape=(n_data, height, width, channel))
-            画像データのリスト
-        image_name_list : list of str
-            読み込まれた画像のファイル名のリスト
-            インデックスはimages, classesと対応
+        -------------
+        df_annotation : pandas.DataFrame
+            Annotationデータフレーム
+            [列]
+            ・x, y, w, h: BBOXの座標と幅・高さ
+            ・width, height: 画像ファイルの幅・高さ
+            ・class_label: クラスラベル
+            ・class_index: クラスインデックス（0から順にふる）
+            ・image_filename: 各Annotationに対応する画像ファイル名
         """
-        images = []
-        image_name_list = []
+        # annotationディレクトリにある全xmlファイル名リストを作成
+        annotation_filepath_list = glob.glob(os.path.join(annotation_path, '*.xml'))
+        assert len(annotation_filepath_list) != 0, 'Annotationファイルが見つかりませんでした'
+        # Annotationデータフレーム読み込み
+        df_annotation = get_annotations(annotation_filepath_list, class_index_map=class_index_map,
+                                        add_imagefile_extension=add_imagefile_extension)
+        return df_annotation
+    
+    def _resize_annotation(self, df_annotation, resize_shape):
+        '''
+        画像をリサイズしたときのBBOXを計算する
 
-        batches_per_epoch = datagen.samples // datagen.batch_size + (datagen.samples % datagen.batch_size > 0)
-        for i in range(batches_per_epoch):
-            batch = next(datagen)
-            current_index = ((datagen.batch_index-1) * datagen.batch_size)
-            if current_index < 0:
-                if datagen.samples % datagen.batch_size > 0:
-                    current_index = max(0,datagen.samples - datagen.samples % datagen.batch_size)
-                else:
-                    current_index = max(0,datagen.samples - datagen.batch_size)
-            images.append(batch[0])
-            index_array = datagen.index_array[current_index:current_index + datagen.batch_size].tolist()
-            image_name_list += [datagen.filenames[idx] for idx in index_array]
+        Parameters
+        -------------
+        df_annotation : pandas.DataFrame
+            Annotationデータフレーム
+            [必要な列]
+            ・x, y, w, h: BBOXの座標と幅・高さ
+        resize_shape : tuple
+            画像データをこのサイズに統一する
         
-        images = np.concatenate(images, axis=0)
-        return images, image_name_list
-    
-    def _image_filename_to_annotation_filename(self, image_filename):
-        """
-        画像ファイル名をAnnotationファイル名に変換
-        """
-        filename = image_filename.split('/')[-1]  # ファイルパスの場合、ファイル名のみ取得
-        filename_remove_extention = filename.split('.')[0]  # 拡張子を取り除いたファイル
-        annotation_filename = filename_remove_extention + '.xml'
-        return annotation_filename
-    
-    def _get_bbox_info(self, annotation_dir, annotation_filename, img_index):
-        """
-        annotationファイルからbbox情報を読み込み。画像のインデックスと紐付ける
-        """
-        # annotation読み込み
-        annotation_filepath = os.path.join(annotation_dir, annotation_filename)
-        img_filename, df_bbox_info = xml_to_labels(annotation_filepath)
+        Returns
+        --------------
+        df_annotation_resized : pandas.DataFrame
+            BBOXをリサイズしたデータフレーム。入力と同形
+        '''
+        df_annotation_resized = df_annotation.copy()
 
-        # bbox情報に画像ファイル名、画像インデックスを紐付ける
-        df_bbox_info.loc[:, 'image_filename'] = [img_filename] * len(df_bbox_info)
-        df_bbox_info.loc[:, 'image_index'] = [img_index] * len(df_bbox_info)
+        df_annotation_resized['width'] = resize_shape[1]
+        rate_x = resize_shape[1] / df_annotation['width']   # x方向の倍率
+        df_annotation_resized['x'] = df_annotation['x'] * rate_x
+        df_annotation_resized['w'] = df_annotation['w'] * rate_x
 
-        return df_bbox_info
+        df_annotation_resized['height'] = resize_shape[0]
+        rate_y = resize_shape[0] / df_annotation['height']   # y方向の倍率
+        df_annotation_resized['y'] = df_annotation['y'] * rate_y
+        df_annotation_resized['h'] = df_annotation['h'] * rate_y
+
+        return df_annotation_resized
+
+    def _image_annotation_generator(self,
+                                    image_path,
+                                    df_annotation,
+                                    batch_size,
+                                    resize_shape=(255, 255)):
+        '''
+        画像データとAnnotationを合わせて取得するジェネレータ
+
+        Paramteres
+        --------------
+        image_path : str
+            画像データが格納されたディレクトリへのパス
+        df_annotation : pandas.DataFrame
+            Annotationデータフレーム
+        batch_size : int
+            バッチサイズ
+        resize_shape : tuple or None
+            画像データをこのサイズにリサイズする。Noneの場合はリサイズしない
+        
+        Yields
+        -------------
+        image_tensors : list of tf.Tensor(shape=(1, height, width, 3))
+            画像のリスト
+        bbox_tensors : list of tf.Tensor(shape=(n_bbox, 4))
+            BBOXのリスト
+        class_tensors : list of tf.Tensor(shape=(n_bbox, n_class))
+            クラス(one_hot)のリスト
+        '''
+        # Annotationデータからユニークな画像ファイルパスを取得
+        filename_unique = df_annotation['image_filename'].unique()
+        # クラス数を取得
+        num_class = df_annotation['class_index'].unique().size
+        
+        while True:
+            # バッチ数分の画像ファイル名リストを取得
+            filename_batch = np.random.choice(filename_unique, size=batch_size)
+
+            # バッチ毎にデータを取得
+            image_tensors = []
+            bbox_tensors = []
+            class_tensors = []
+            for filename in filename_batch:
+                # 画像
+                with Image.open(os.path.join(image_path, filename)) as image:
+                    if resize_shape is not None:
+                        image = image.resize(resize_shape)
+                    image_array = np.array(image)
+                image_tensor = tf.convert_to_tensor(image_array, dtype=tf.float32)
+                image_tensors.append(image_tensor)
+
+                # BBOX
+                df_annotation_batch = df_annotation.loc[df_annotation['image_filename']==filename]
+                bbox_array = df_annotation_batch[['x', 'y', 'w', 'h']].values
+                bbox_tensor = tf.convert_to_tensor(bbox_array, dtype=tf.float32)
+                bbox_tensors.append(bbox_tensor)
+
+                # class
+                class_index_array = df_annotation_batch['class_index'].values
+                one_hot_tensor = tf.one_hot(class_index_array, num_class)
+                class_tensors.append(one_hot_tensor)
+            
+            yield image_tensors, bbox_tensors, class_tensors
