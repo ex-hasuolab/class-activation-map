@@ -227,14 +227,14 @@ class Dataloader(object):
         if validation_dir is not None:
             self.df_annotation_validation = self._get_df_annotation(
                 os.path.join(validation_dir, 'annotation'),
-                class_index_map=self.classlabel_to_index,
+                class_index_map=self.label_to_index,
                 add_imagefile_extension=add_imagefile_extension)
         
         # テストデータ
         if test_dir is not None:
             self.df_annotation_test = self._get_df_annotation(
                 os.path.join(test_dir, 'annotation'),
-                class_index_map=self.classlabel_to_index,
+                class_index_map=self.label_to_index,
                 add_imagefile_extension=add_imagefile_extension)
         
         ##########
@@ -356,7 +356,7 @@ class Dataloader(object):
                 with Image.open(os.path.join(image_path, filename)) as image:
                     if resize_shape is not None:
                         image = image.resize(resize_shape)
-                    image_array = np.array(image)
+                    image_array = np.array(image)[np.newaxis, :]  # [1, height, width, colors]
                 image_tensor = tf.convert_to_tensor(image_array, dtype=tf.float32)
                 image_tensors.append(image_tensor)
 
