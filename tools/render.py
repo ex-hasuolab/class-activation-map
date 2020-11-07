@@ -17,7 +17,7 @@ def plot_detections(image_np,
     image_np : np.array, shape=(img_height, img_width, 3), dtype=int
         画像データ（必ずintにする）
     boxes : np.array, shape (N, 4)
-        BBOX（x, y, w, h）
+        BBOX（ymin_rate, xmin_rate, ymax_rate, xmax_rate）
     classes: np.array, shape (N,)
         クラスインデックス（0始まり）
         （内部で1始まりのインデックスに変換してからvisualize_boxes_and_labels_on_image_array関数に入れている）

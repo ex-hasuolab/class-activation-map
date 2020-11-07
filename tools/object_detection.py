@@ -23,10 +23,10 @@ def xml_to_labels(annotation_file):
         画像ファイル名
     df_annotations : pandas.DataFrame, shape=(num_object, 5)
         画像に写っている物体(num_object個)に対し、下記の5つのカラムを持つDF
-        ・x: BBOX左下のx座標
-        ・y: BBOX左下のy座標
-        ・w: BBOXの幅
-        ・h: BBOXの高さ
+        ・xmin: BBOXのx座標のmin
+        ・ymin: BBOXのy座標のmin
+        ・xmax: BBOXのx座標のmax
+        ・ymax: BBOXのy座標のmax
         ・label: クラスラベル
     '''
     with open(annotation_file) as f:
@@ -35,7 +35,7 @@ def xml_to_labels(annotation_file):
     # xml操作
     root = ET.XML(xml_data)
     obj_to_int = lambda x: int(x.text)
-    df_annotations = pd.DataFrame(columns=['x', 'y', 'w', 'h', 'width', 'height', 'class_label'])
+    df_annotations = pd.DataFrame(columns=['xmin', 'ymin', 'xmax', 'ymax', 'width', 'height', 'class_label'])
     for i, child in enumerate(root):
         if child.tag == 'filename':
             img_filename = child.text
@@ -53,11 +53,11 @@ def xml_to_labels(annotation_file):
                 if subchild.tag == 'bndbox':
                     xmin, ymin, xmax, ymax = tuple(map(obj_to_int, subchild.getchildren()))
             # BBOXの幅と高さを計算
-            w = xmax - xmin
-            h = ymax - ymin
+            #w = xmax - xmin
+            #h = ymax - ymin
             # DFに追加
             df_annotations = df_annotations.append(
-                {'x': xmin, 'y': ymin, 'w': w, 'h': h, 'width': width, 'height': height, 'class_label': label},
+                {'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax, 'width': width, 'height': height, 'class_label': label},
                 ignore_index=True
             )
     return img_filename, df_annotations
@@ -107,7 +107,7 @@ def get_one_annotation(annotation_filepath):
     df_annotation : pandas.DataFrame
         Annotationデータフレーム
         [列]
-        ・x, y, w, h: BBOXの座標と幅・高さ
+        ・xmin, ymin, xmax, ymax: BBOXの四隅の座標
         ・width, height: 画像ファイルの幅・高さ
         ・class_label: クラスラベル
         ・image_filename: 各Annotationに対応する画像ファイル名
@@ -140,7 +140,7 @@ def get_annotations(annotation_filepath_list, class_index_map=None, add_imagefil
     df_annotation : pandas.DataFrame
         Annotationデータフレーム
         [列]
-        ・x, y, w, h: BBOXの座標と幅・高さ
+        ・xmin, ymin, xmax, ymax: BBOXの四隅の座標
         ・width, height: 画像ファイルの幅・高さ
         ・class_label: クラスラベル
         ・class_index: クラスインデックス（0から順にふる）

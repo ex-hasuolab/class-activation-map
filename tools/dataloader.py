@@ -218,10 +218,6 @@ class Dataloader(object):
         self.df_annotation_train = self._get_df_annotation(
             os.path.join(train_dir, 'annotation'),
             add_imagefile_extension=add_imagefile_extension)
-        # リサイズ
-        if resize_shape is not None:
-            self.df_annotation_train_resized = self._resize_annotation(
-                self.df_annotation_train, resize_shape)
         # クラス名とインデックスの対応関係を取得
         df_label_index = self.df_annotation_train[['class_label', 'class_index']].drop_duplicates()
         self.label_to_index = df_label_index.set_index('class_label')['class_index'].to_dict()
@@ -233,10 +229,6 @@ class Dataloader(object):
                 os.path.join(validation_dir, 'annotation'),
                 class_index_map=self.classlabel_to_index,
                 add_imagefile_extension=add_imagefile_extension)
-            # リサイズ
-            if resize_shape is not None:
-                self.df_annotation_validation_resized = self._resize_annotation(
-                    self.df_annotation_validation, resize_shape)
         
         # テストデータ
         if test_dir is not None:
@@ -244,39 +236,30 @@ class Dataloader(object):
                 os.path.join(test_dir, 'annotation'),
                 class_index_map=self.classlabel_to_index,
                 add_imagefile_extension=add_imagefile_extension)
-            # リサイズ
-            if resize_shape is not None:
-                self.df_annotation_test_resized = self._resize_annotation(
-                    self.df_annotation_test, resize_shape)
         
         ##########
         # generator作成
         ##########
         # 訓練データ
-        df_annotation = self.df_annotation_train if resize_shape is None\
-                            else self.df_annotation_train_resized
         self.train_generator = self._image_annotation_generator(
             os.path.join(train_dir, 'images'),
-            df_annotation,
+            self.df_annotation_train,
             batch_size,
             resize_shape=resize_shape)
         
         # 検証データ
         if validation_dir is not None:
-            df_annotation = self.df_annotation_validation if resize_shape is None\
-                                else self.df_annotation_validation_resized
             self.validation_generator = self._image_annotation_generator(
                 os.path.join(validation_dir, 'images'),
-                df_annotation,
+                self.df_annotation_validation,
                 batch_size,
                 resize_shape=resize_shape)
+        
         # テストデータ
         if test_dir is not None:   
-            df_annotation = self.df_annotation_test if resize_shape is None\
-                                else self.df_annotation_test_resized
             self.test_generator = self._image_annotation_generator(
                 os.path.join(test_dir, 'images'),
-                df_annotation,
+                self.df_annotation_test,
                 batch_size,
                 resize_shape=resize_shape)
 
@@ -302,7 +285,7 @@ class Dataloader(object):
         df_annotation : pandas.DataFrame
             Annotationデータフレーム
             [列]
-            ・x, y, w, h: BBOXの座標と幅・高さ
+            ・xmin_rate, ymin_rate, xmax_rate, ymax_rate: BBOXの四隅の相対座標(0~1)
             ・width, height: 画像ファイルの幅・高さ
             ・class_label: クラスラベル
             ・class_index: クラスインデックス（0から順にふる）
@@ -311,42 +294,21 @@ class Dataloader(object):
         # annotationディレクトリにある全xmlファイル名リストを作成
         annotation_filepath_list = glob.glob(os.path.join(annotation_path, '*.xml'))
         assert len(annotation_filepath_list) != 0, 'Annotationファイルが見つかりませんでした'
+
         # Annotationデータフレーム読み込み
         df_annotation = get_annotations(annotation_filepath_list, class_index_map=class_index_map,
                                         add_imagefile_extension=add_imagefile_extension)
-        return df_annotation
-    
-    def _resize_annotation(self, df_annotation, resize_shape):
-        '''
-        画像をリサイズしたときのBBOXを計算する
-
-        Parameters
-        -------------
-        df_annotation : pandas.DataFrame
-            Annotationデータフレーム
-            [必要な列]
-            ・x, y, w, h: BBOXの座標と幅・高さ
-        resize_shape : tuple
-            画像データをこのサイズに統一する
         
-        Returns
-        --------------
-        df_annotation_resized : pandas.DataFrame
-            BBOXをリサイズしたデータフレーム。入力と同形
-        '''
-        df_annotation_resized = df_annotation.copy()
+        # BBOX情報を割合に変換
+        df_annotation['xmin_rate'] = df_annotation['xmin'] / df_annotation['width']
+        df_annotation['ymin_rate'] = df_annotation['ymin'] / df_annotation['height']
+        df_annotation['xmax_rate'] = df_annotation['xmax'] / df_annotation['width']
+        df_annotation['ymax_rate'] = df_annotation['ymax'] / df_annotation['height']
 
-        df_annotation_resized['width'] = resize_shape[1]
-        rate_x = resize_shape[1] / df_annotation['width']   # x方向の倍率
-        df_annotation_resized['x'] = df_annotation['x'] * rate_x
-        df_annotation_resized['w'] = df_annotation['w'] * rate_x
-
-        df_annotation_resized['height'] = resize_shape[0]
-        rate_y = resize_shape[0] / df_annotation['height']   # y方向の倍率
-        df_annotation_resized['y'] = df_annotation['y'] * rate_y
-        df_annotation_resized['h'] = df_annotation['h'] * rate_y
-
-        return df_annotation_resized
+        # 必要な列だけ取り出す
+        df_annotation = df_annotation[['xmin_rate', 'ymin_rate', 'xmax_rate', 'ymax_rate',
+                                       'width', 'height', 'class_label', 'class_index', 'image_filename']]
+        return df_annotation
 
     def _image_annotation_generator(self,
                                     image_path,
@@ -372,7 +334,7 @@ class Dataloader(object):
         image_tensors : list of tf.Tensor(shape=(1, height, width, 3))
             画像のリスト
         bbox_tensors : list of tf.Tensor(shape=(n_bbox, 4))
-            BBOXのリスト
+            BBOXのリスト [ymin_rate, xmin_rage, ymax_rate, xmax_rate]
         class_tensors : list of tf.Tensor(shape=(n_bbox, n_class))
             クラス(one_hot)のリスト
         '''
@@ -383,7 +345,7 @@ class Dataloader(object):
         
         while True:
             # バッチ数分の画像ファイル名リストを取得
-            filename_batch = np.random.choice(filename_unique, size=batch_size)
+            filename_batch = np.random.choice(filename_unique, size=batch_size, replace=False)
 
             # バッチ毎にデータを取得
             image_tensors = []
@@ -400,7 +362,7 @@ class Dataloader(object):
 
                 # BBOX
                 df_annotation_batch = df_annotation.loc[df_annotation['image_filename']==filename]
-                bbox_array = df_annotation_batch[['x', 'y', 'w', 'h']].values
+                bbox_array = df_annotation_batch[['ymin_rate', 'xmin_rate', 'ymax_rate', 'xmax_rate']].values
                 bbox_tensor = tf.convert_to_tensor(bbox_array, dtype=tf.float32)
                 bbox_tensors.append(bbox_tensor)
 
