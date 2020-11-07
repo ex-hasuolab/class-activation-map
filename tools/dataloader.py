@@ -10,7 +10,7 @@ import keras
 #from tensorflow.keras.datasets.cifar10 import load_data
 from tensorflow.keras.datasets.mnist import load_data
 from keras.preprocessing.image import ImageDataGenerator
-from .object_detection import get_annotations
+from .read_annotation import get_annotations
 import os
 import glob
 import tensorflow as tf
