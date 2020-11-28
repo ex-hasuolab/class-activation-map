@@ -1,0 +1,14 @@
+version: '2.3'
+
+services:
+  python:
+    build:
+        context: ./
+        dockerfile: Dockerfile
+    image: test_python
+    container_name: test_python_container
+    ports:
+      - 8890:8888
+    volumes:
+      - ./data/:/home/tensorflow/data/
+    # command: /bin/bash -c "while :; do sleep 10; done"
