@@ -20,35 +20,37 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     apt-get update -y && apt-get install google-cloud-sdk -y
 
-# Add new user to avoid running as root
+# tensorflowユーザーの追加(-msでhomeディレクトリを作成)
 RUN useradd -ms /bin/bash tensorflow
-USER tensorflow
-WORKDIR /home/tensorflow
+RUN usermod -u 1000 tensorflow
+RUN groupmod -g 1000 tensorflow
 
-# Copy this version of of the model garden into the image
-#COPY --chown=tensorflow . /home/tensorflow/models
-RUN git clone --depth 1 https://github.com/tensorflow/models &&\
-    chown -R tensorflow models
+RUN echo "root:root" | chpasswd && \
+    echo "${username}:${username}" | chpasswd
+
+USER tensorflow
+RUN python -m pip install --user jupyterlab
 
 # Compile protobuf configs
+# Copy this version of of the model garden into the image
+# COPY --chown=tensorflow . /home/tensorflow/models
+WORKDIR /home/tensorflow
+RUN git clone --depth 1 https://github.com/tensorflow/models && chown -R tensorflow models/
 RUN (cd /home/tensorflow/models/research/ && protoc object_detection/protos/*.proto --python_out=.)
 WORKDIR /home/tensorflow/models/research/
-
-RUN cp object_detection/packages/tf2/setup.py ./
 ENV PATH="/home/tensorflow/.local/bin:${PATH}"
-
-RUN python -m pip install -U pip
-RUN python -m pip install .
-
 # 上でpip installされるtensorflow:2.3.0を削除
+RUN python -m pip install -U pip
+RUN cp object_detection/packages/tf2/setup.py ./
+RUN python -m pip install .
 RUN python -m pip uninstall -y tensorflow
-RUN python -m pip install jupyterlab \
-    imageio \
-    scikit-learn \
-    keras
-ENV TF_CPP_MIN_LOG_LEVEL 3
+RUN python -m pip install jupyterlab imageio scikit-learn keras
 
-# Jupyter設定
+WORKDIR /home/tensorflow/workspace
+RUN git clone https://github.com/ex-hasuolab/deeplearning-set.git
+
+ENV TF_CPP_MIN_LOG_LEVEL 3
 RUN jupyter notebook --generate-config
-RUN echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py
-#    echo "c.NotebookApp.notebook_dir = '/home/tensorflow'" >> ~/.jupyter/jupyter_notebook_config.py &&\
+RUN echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py && \
+    echo "c.NotebookApp.notebook_dir = '/home/tensorflow/" >> ~/.jupyter/jupyter_notebook_config.py
+CMD jupyter lab --port 8888 --ip=0.0.0.0
