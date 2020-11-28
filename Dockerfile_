@@ -1,0 +1,76 @@
+FROM python:3.7.6-slim as build-stage
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG username=tensorflow
+ARG wkdir=/home/tensorflow
+
+# tensorflowユーザーの追加(-msでhomeディレクトリを作成)
+RUN useradd -ms /bin/bash tensorflow
+RUN usermod -u 1000 tensorflow
+RUN groupmod -g 1000 tensorflow
+
+# passwordを変更する (rootに切り替えてapt-get installしたい時があるから)
+RUN echo "root:root" | chpasswd && \
+    echo "${username}:${username}" | chpasswd
+
+# sudoersにユーザーを追加（非推奨）
+# RUN apt-get update -qq \
+#   && apt-get install -y --no-install-recommends sudo
+# RUN echo "%${username}    ALL=(ALL)   NOPASSWD:    ALL" >> /etc/sudoers.d/${username} && \
+#     chmod 0440 /etc/sudoers.d/${username} 
+
+# Jupyter設定 (pip installに--userつけること！！)
+USER ${username}
+WORKDIR ${wkdir}
+RUN python -m pip install --user jupyterlab
+
+ENV PATH="/home/tensorflow/.local/bin:${PATH}"
+RUN jupyter notebook --generate-config
+RUN echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py && \
+    echo "c.NotebookApp.notebook_dir = '/home/tensorflow/" >> ~/.jupyter/jupyter_notebook_config.py
+
+CMD jupyter lab --port 8888 --ip=0.0.0.0
+
+## マルチステージビルド
+# FROM python:3.7.6-slim
+# COPY --from=build-stage /tensorflow/.cache/pip /root/.cache/pip
+# COPY --from=build-stage /root/requirements.txt /root
+## Pythonモジュールで使用するライブラリをコピー
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libodbc.so.2 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libodbcinst.so.2 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libkrb5.so.3 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libltdl.so.7 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libk5crypto.so.3 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libkrb5support.so.0 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /lib/x86_64-linux-gnu/libkeyutils.so.1 /lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libk5crypto.so.3 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /usr/lib/x86_64-linux-gnu/libkrb5support.so.0 /usr/lib/x86_64-linux-gnu/
+# COPY --from=build-stage /lib/x86_64-linux-gnu/libkeyutils.so.1 /lib/x86_64-linux-gnu/
+# RUN apt-get update
+# RUN pip3 install -r /root/requirements.txt \
+# && rm -rf /root/.cache/pip
+
+# 勉強したこと
+# visudoコマンドで/etc/sudoersが見れる
+# どうやらgpasswd -a newuser sudoと/etc/sudoersを直接編集するのは同じ意味
+# passwdは対話的に&各ユーザーでしかパスワード設定出来ないが，gpasswdは非対話的で一括で全ユーザーを操れるのでDockerfile向き
+# env | grep PATHで定義されているパスの確認が可能
+# sudoersよりもsudoers.dを編集したほうが良い．（https://www.greptips.com/posts/54/）
+# sudoのコマンドが無い場合はapt-get install sudoで入れると良い．
+# echo "root:root" | chpasswdでユーザーのパスワードを変更できる
+# `python -m pip install --user jupyterlab` tensorflowユーザーだけにパッケージを入れたい時は--userオプションをつける．抜くとrootにも入れようとしてエラーが起こる
+# /.local/bin/にpipで入れたコマンド達がいる
+# which jupyter : ~/.local/bin
+
+# 勉強したいこと
+# Dockerfileベストプラクティス
+# sudoではなく，gosuを遣う
+# zshを遣う
+# ttyとは
+
+# ??
+# Dockerfileでuserを作る意味
+# gosuとUSERの使い分け
+# /usr/local/bin
+# コンテナのimageサイズが小さいといい理由
