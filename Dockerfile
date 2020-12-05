@@ -1,6 +1,7 @@
 FROM tensorflow/tensorflow:2.2.0-gpu
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG username=tensorflow
 
 # Install apt dependencies
 RUN apt-get update && apt-get install -y \
@@ -46,11 +47,13 @@ RUN python -m pip install .
 RUN python -m pip uninstall -y tensorflow
 RUN python -m pip install jupyterlab imageio scikit-learn keras
 
+# WORKDIRで存在しないディレクトリを作成するとroot権限で作成される(?)っぽいので手動で作成
+RUN mkdir /home/tensorflow/workspace
 WORKDIR /home/tensorflow/workspace
 RUN git clone https://github.com/ex-hasuolab/deeplearning-set.git
 
 ENV TF_CPP_MIN_LOG_LEVEL 3
 RUN jupyter notebook --generate-config
 RUN echo "c.NotebookApp.token = ''" >> ~/.jupyter/jupyter_notebook_config.py && \
-    echo "c.NotebookApp.notebook_dir = '/home/tensorflow/" >> ~/.jupyter/jupyter_notebook_config.py
+    echo "c.NotebookApp.notebook_dir = '/home/tensorflow/'" >> ~/.jupyter/jupyter_notebook_config.py
 CMD jupyter lab --port 8888 --ip=0.0.0.0
