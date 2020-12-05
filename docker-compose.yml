@@ -14,5 +14,5 @@ services:
       - 8882:8888
     volumes:
       - ./:/home/tensorflow/workspace/
-    command: /bin/bash -c "jupyter lab --port 8888 --ip=0.0.0.0"
+    #command: /bin/bash -c "jupyter lab --port 8888 --ip=0.0.0.0"
     # command: /bin/bash -c "while :; do sleep 10; done"
