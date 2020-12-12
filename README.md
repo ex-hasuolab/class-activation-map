@@ -10,6 +10,9 @@
 transfer learningをする時に，既存のfeature_extracterを完全にこていしてしまうと，精度も落ちるしそこまで学習が速いわけでも無い．
 全体のネットワークの重みを最適化していく方が良い．
 
+https://github.com/tensorflow/models/issues/2203#issuecomment-361045083
+ただ，データ数が少ない時はfeature extracterの重みを固定するのがDLの世界では有効であるとされているので，その結論はおかしいのではという人も
+
 # Tensorflow公式colab_tutorials
 
 https://github.com/tensorflow/models/tree/master/research/object_detection/colab_tutorials
