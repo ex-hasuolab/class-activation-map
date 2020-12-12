@@ -1,3 +1,10 @@
+# 次のtodo
+・documentを色々読んで見る
+https://github.com/tensorflow/models/tree/master/research/object_detection/g3doc
+
+・configファイルのパラメータ理解とscratch理解
+ssd/mobilenet/resnet/hourglassとかのネットワーク構造を理解しておいた方がいい？
+
 # Issueから調べたこと
 ① https://github.com/tensorflow/models/issues/9133
 ・trainする時はpbtxtとconfigのnum_classが一緒である必要あり
