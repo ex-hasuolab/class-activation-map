@@ -5,7 +5,10 @@
 
 ② https://github.com/tensorflow/models/issues/8892#issuecomment-662164279
 ・efficientdetを遣う時num_classをデフォルト90から変える時は，fine_tune_checkpoint_type to "detection"にする必要がある．
-・
+
+③ https://github.com/tensorflow/models/issues/2203#issuecomment-323645873
+transfer learningをする時に，既存のfeature_extracterを完全にこていしてしまうと，精度も落ちるしそこまで学習が速いわけでも無い．
+全体のネットワークの重みを最適化していく方が良い．
 
 # Tensorflow公式colab_tutorials
 
