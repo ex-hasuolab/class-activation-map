@@ -1,7 +1,11 @@
 # Issueから調べたこと
+① https://github.com/tensorflow/models/issues/9133
 ・trainする時はpbtxtとconfigのnum_classが一緒である必要あり
 ・evaluateする時はpbtxtとconfigとckptのnum_classが一緒である必要あり
-https://github.com/tensorflow/models/issues/9133
+
+② https://github.com/tensorflow/models/issues/8892#issuecomment-662164279
+・efficientdetを遣う時num_classをデフォルト90から変える時は，fine_tune_checkpoint_type to "detection"にする必要がある．
+・
 
 # Tensorflow公式colab_tutorials
 
