@@ -1,3 +1,8 @@
+# Issueから調べたこと
+・trainする時はpbtxtとconfigのnum_classが一緒である必要あり
+・evaluateする時はpbtxtとconfigとckptのnum_classが一緒である必要あり
+https://github.com/tensorflow/models/issues/9133
+
 # Tensorflow公式colab_tutorials
 
 https://github.com/tensorflow/models/tree/master/research/object_detection/colab_tutorials
