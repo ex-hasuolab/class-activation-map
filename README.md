@@ -13,6 +13,13 @@ transfer learningをする時に，既存のfeature_extracterを完全にこて�
 https://github.com/tensorflow/models/issues/2203#issuecomment-361045083
 ただ，データ数が少ない時はfeature extracterの重みを固定するのがDLの世界では有効であるとされているので，その結論はおかしいのではという人も
 
+https://github.com/tensorflow/models/issues/2203#issuecomment-383756826
+レイヤー名を確認して，どの重みを固定しておきたいかはここでいじる事が出来る
+
+?? そもそもDLの世界ではextracterの重みを固定することに大きな高価はあるのだろうか？？
+
+④ 
+
 # Tensorflow公式colab_tutorials
 
 https://github.com/tensorflow/models/tree/master/research/object_detection/colab_tutorials
