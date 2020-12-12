@@ -4,6 +4,9 @@ https://github.com/tensorflow/models/tree/master/research/object_detection/g3doc
 
 ・configファイルのパラメータ理解とscratch理解
 ssd/mobilenet/resnet/hourglassとかのネットワーク構造を理解しておいた方がいい？
+　
+・tensorflowの重みのよみこみ方
+https://www.tensorflow.org/guide/checkpoint#loading_mechanics
 
 # Issueから調べたこと
 ① https://github.com/tensorflow/models/issues/9133
